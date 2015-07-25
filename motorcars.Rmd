@@ -1,0 +1,51 @@
+---
+title: "Regression Modelling of Car MPG vs. Transmission type"
+author: "MattDSquared"
+date: "Saturday, July 25, 2015"
+output: html_document
+---
+
+## Introduction
+_from coursera.org class project description_
+You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+"Is an automatic or manual transmission better for MPG"
+"Quantify the MPG difference between automatic and manual transmissions"
+
+## Setup and data cleaning
+
+The mtcars dataset from 1981 will be used to answer these questions. 
+
+```{r setup, echo=FALSE, message=FALSE}
+library(datasets)
+library(dplyr)
+library(xtable)
+library(ggplot2)
+
+setwd("~/../datascience/RegressionModels-MotorCars")
+data(mtcars)
+```
+
+```{r cleaning, results='asis'}
+# rename vars
+mtcars <- rename(mtcars, cylinders=cyl, displacement=disp, power=hp, 
+                 axle.ratio=drat, weight=wt, quarter.mile.time=qsec, 
+                 engine.shape=vs, transmission=am, n.gears=gear, 
+                 n.carburetors=carb)
+
+# clarify values based on ?mtcars info
+mtcars <- mutate(mtcars,
+                 weight=weight*1000,
+                 engine.shape=factor(engine.shape, levels=c(0,1), 
+                                     labels=c("v","straight")),
+                 transmission=factor(transmission, levels=c(0,1),
+                                     labels=c("automatic","manual")))
+```
+
+```{r, echo=FALSE, results='asis'}
+tab <- xtable(head(mtcars))
+print(tab, type = "html")
+```
+
+## Data Exploration
+
