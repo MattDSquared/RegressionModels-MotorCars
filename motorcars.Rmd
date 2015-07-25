@@ -5,12 +5,62 @@ date: "Saturday, July 25, 2015"
 output: html_document
 ---
 
+```{r nonstandard.functions, echo=FALSE, results='hide', message=FALSE}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
 ## Introduction
 _from coursera.org class project description_
 You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
 
 "Is an automatic or manual transmission better for MPG"
 "Quantify the MPG difference between automatic and manual transmissions"
+
+R markdown code can be found at my github site: https://github.com/MattDSquared/RegressionModels-MotorCars/blob/master/motorcars.Rmd
 
 ## Setup and data cleaning
 
@@ -24,15 +74,15 @@ library(ggplot2)
 
 setwd("~/../datascience/RegressionModels-MotorCars")
 data(mtcars)
-```
 
-```{r cleaning, results='asis'}
 # rename vars
 mtcars <- rename(mtcars, cylinders=cyl, displacement=disp, power=hp, 
                  axle.ratio=drat, weight=wt, quarter.mile.time=qsec, 
                  engine.shape=vs, transmission=am, n.gears=gear, 
                  n.carburetors=carb)
+```
 
+```{r cleaning, results='asis'}
 # clarify values based on ?mtcars info
 mtcars <- mutate(mtcars,
                  weight=weight*1000,
@@ -49,3 +99,21 @@ print(tab, type = "html")
 
 ## Data Exploration
 
+```{r exploration.plots, echo=FALSE, fig.width=8, fig.height=14}
+# MPG vs feature broken out between automatic and manual
+gg  <- list()
+
+ii <- 0
+for (feat.name in names(mtcars)[2:ncol(mtcars)]) {
+    #tmp <- select(mtcars, mpg, transmission, feat.name)
+    #rename(tmp, )
+    ii <- ii + 1
+    gg[[ii]] <- ggplot(mtcars, aes_string(x=feat.name, 
+                                          y="mpg", 
+                                          col="transmission")) +
+        geom_point() + 
+        geom_smooth(method="lm") 
+}
+
+multiplot(plotlist = gg, cols=2)
+```
