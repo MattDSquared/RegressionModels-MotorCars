@@ -88,6 +88,11 @@ mtcars <- rename(mtcars, cylinders=cyl, displacement=disp, power=hp,
                  axle.ratio=drat, weight=wt, quarter.mile.time=qsec, 
                  engine.shape=vs, transmission=am, n.gears=gear, 
                  n.carburetors=carb)
+
+# move row names into it's own column
+mtcars <-  mutate(mtcars, carnames=rownames(mtcars))
+# move carnames to 1st column
+mtcars <- mtcars[,c(ncol(mtcars),1:length(mtcars)-1)]
 ```
 
 ```{r cleaning, results='asis'}
@@ -101,6 +106,8 @@ mtcars <- mutate(mtcars,
                  log.displacement=log(displacement),
                  log.weight=log(weight))
 
+# for ease of using plot(myfit)
+rownames(mtcars) <- mtcars$carnames
 # note: engine.shape has levels(0,1) = ("v","straight")
 #       transmission has levels(0,1) = ("auto","manual")
 ```
@@ -122,7 +129,7 @@ mtcars %>% group_by(transmission) %>% summarize(mean(mpg))
 gg  <- list()
 
 ii <- 0
-for (feat.name in names(mtcars)[2:ncol(mtcars)]) {
+for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
     #tmp <- select(mtcars, mpg, transmission, feat.name)
     #rename(tmp, )
     ii <- ii + 1
@@ -130,14 +137,16 @@ for (feat.name in names(mtcars)[2:ncol(mtcars)]) {
                                           y="mpg", 
                                           col="transmission")) +
         geom_point() + 
-        geom_smooth(method="lm") 
+        geom_smooth(method="lm") +
+        geom_smooth(aes_string(x=feat.name, y="mpg"), method="lm", 
+                    col="black", se=FALSE)
 }
 windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
 
-windows(width = 13, height = 11, xpos = 30)
-pairs(mtcars, panel = panel.smooth, main = "Motor Cars", 
-      col = 3 + (mtcars$log.displacement > 5.25))
+#windows(width = 13, height = 11, xpos = 30)
+#pairs(select(mtcars, -carnames), panel = panel.smooth, main = "Motor Cars", 
+#      col = 3 + (mtcars$log.displacement > 5.25))
 
 # ggpairs(mtcars, lower=list(continuous = "smooth"), params=c(method="lm"))
 ```
@@ -146,19 +155,9 @@ pairs(mtcars, panel = panel.smooth, main = "Motor Cars",
 ```
 
 ## Model reduction
-due to the apparent lack of dependence on transmission type, lets factor out the dependence mpg has on displacement and weight.
+Used the ANOVA model search technique to identify variables of interest to our model. We begin with effect of the transmission, since we are specifically interested in it's effect. 
 
-```{r model.displacement}
-windows(4,3,xpos=0)
-print(gg[[11]])
-#mpg.displacement <- predict()
-
-
-#myfit1 <- lm(mpg ~ transmission, data=mtcars)
-#myfit2 <- lm(mpg ~ 
-#                 transmission + 
-#                 log.weight, 
-#             data=mtcars)
+```{r ANOVA.model.search, echo=FALSE}
 myfit1 <- lm(mpg ~ transmission, data=mtcars)
 myfit2 <- lm(mpg ~ transmission + log.weight, data=mtcars)
 myfit3 <- lm(mpg ~ transmission + log.weight + log.displacement, data=mtcars)
@@ -170,5 +169,4 @@ myfit_all <- lm(mpg ~ transmission +
                  n.gears + n.carburetors, data=mtcars)
 
 print(anova(myfit1, myfit2, myfit3, myfit_all))
-
 ```
