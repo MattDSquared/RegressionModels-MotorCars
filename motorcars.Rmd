@@ -138,13 +138,15 @@ fit[[5]] <- lm(mpg ~ transmission +
                  quarter.mile.time + engine.shape +
                  n.gears + n.carburetors, data=mtcars)
 
-fit.anova <- anova(fit)
+fit.anova <- anova(fit[[1]], fit[[2]], fit[[3]], fit[[4]], fit[[5]])
 print(fit.anova)
 
 bestfit <- fit[[tail(which(fit.anova$"Pr(>F)" <= .05),n=1)]]
+bestmodel <- deparse(bestfit$call)
+bestmodel <- paste0(bestmodel[1],bestmodel[2])
 ```
 
-The ANOVA results show that the model `r bestfit$call` will provide an optimal level of modeling without excess variance inflation.
+The ANOVA results show that the model `r bestmodel` will provide an optimal level of modeling without excess variance inflation.
 
 ## Model results on mpg vs. transmission type
 
