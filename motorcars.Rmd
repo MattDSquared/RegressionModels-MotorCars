@@ -141,17 +141,23 @@ fit[[5]] <- lm(mpg ~ transmission +
 fit.anova <- anova(fit[[1]], fit[[2]], fit[[3]], fit[[4]], fit[[5]])
 print(fit.anova)
 
-bestfit <- fit[[tail(which(fit.anova$"Pr(>F)" <= .05),n=1)]]
-bestmodel <- deparse(bestfit$call)
-bestmodel <- paste0(bestmodel[1],bestmodel[2])
+bestmodel <- fit[[tail(which(fit.anova$"Pr(>F)" <= .05),n=1)]]
+bestmodel.str <- deparse(bestmodel$call)
+bestmodel.str <- paste0(bestmodel.str[1],bestmodel.str[2])
 ```
 
-The ANOVA results show that the model `r bestmodel` will provide an optimal level of modeling without excess variance inflation.
+The ANOVA results show that the model `r bestmodel.str` will provide an optimal level of modeling without excess variance inflation.
 
 ## Model results on mpg vs. transmission type
 
-```{r results}
+```{r results, echo=c(1)}
+mtcars <- mutate(mtcars, 
+                 mpg_hat = predict(bestmodel),
+                 mpg_e = resid(bestmodel)) #mtcars$mpg - mpg_hat
 
+# lines ignored for clarity
+# move mpg_hat and mpg_e to 3rd and 4th columns
+mtcars <- mtcars[,c(1,2,ncol(mtcars)-1, ncol(mtcars), 3:(length(mtcars)-2))]
 ```
 
 ## Appendix
@@ -206,7 +212,7 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 }
 ```
 
-```{r exploration.plots, echo=FALSE, fig.width=8, fig.height=14}
+```{r exploration.rawdata, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
 gg  <- list()
 ii <- 0
@@ -215,6 +221,36 @@ for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
     #rename(tmp, )
     ii <- ii + 1
     gg[[ii]] <- plot.mpg.by(feat.name)
+}
+windows(width = 9, height = 10, xpos = 0, rescale="fixed")
+multiplot(plotlist = gg, cols=2)
+
+#windows(width = 13, height = 11, xpos = 30)
+#pairs(select(mtcars, -carnames), panel = panel.smooth, main = "Motor Cars", 
+#      col = 3 + (mtcars$log.displacement > 5.25))
+
+# ggpairs(mtcars, lower=list(continuous = "smooth"), params=c(method="lm"))
+```
+
+```{r exploration.residuals, echo=FALSE, fig.width=8, fig.height=14}
+# MPG vs feature broken out between automatic and manual
+
+plot.mpg_e.by <- function(var, main=NULL) {
+    ggplot(mtcars, aes_string(x=var, y="mpg_e", col="transmission")) +
+        geom_point() + 
+        geom_smooth(method="lm") +
+        geom_smooth(aes_string(x=var, y="mpg_e"), method="lm", 
+                    col="black", se=FALSE) +
+        labs(title=main)
+}
+
+gg  <- list()
+ii <- 0
+for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
+    #tmp <- select(mtcars, mpg, transmission, feat.name)
+    #rename(tmp, )
+    ii <- ii + 1
+    gg[[ii]] <- plot.mpg_e.by(feat.name)
 }
 windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
