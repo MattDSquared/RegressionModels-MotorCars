@@ -4,6 +4,56 @@ author: "MattDSquared"
 date: "Saturday, July 25, 2015"
 output: html_document
 ---
+```{r nonstandard.functions, echo=FALSE, results='hide', message=FALSE}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+# credit: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+# author: winston@stdout.org
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
 
 ## Introduction
 _from coursera.org class project description_
@@ -88,7 +138,24 @@ plot.mpg.by <- function(var, main=NULL) {
 ```
 
 ```{r weight.mpg.transmission, echo=FALSE}
-plot.mpg.by("log.weight", main="MPG vs. Weight and Transmission Type")
+gg1 <- ggplot(mtcars, aes(x=log.weight, y=mpg, col=transmission)) +
+    geom_point() + 
+    geom_smooth(method="lm") +
+    geom_smooth(aes(x=log.weight, y=mpg), 
+                method="lm", col="black", se=FALSE) +
+    labs(title="MPG vs. Weight and Transmission Type") + 
+    theme(legend.position="top")
+
+gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg, 
+                               col=transmission)) +
+    geom_point() + 
+    geom_smooth(method="lm") +
+    geom_smooth(aes(x=log.displacement, y=mpg), 
+                method="lm", col="black", se=FALSE) +
+    labs(title="MPG vs. Displacement and Transmission Type") + 
+    theme(legend.position="top")
+
+multiplot(gg1,gg2,cols=2)
 ```
 
 ### Principle Component Analysis (PCA)
@@ -150,67 +217,36 @@ The ANOVA results show that the model `r bestmodel.str` will provide an optimal 
 
 ## Model results on mpg vs. transmission type
 
-```{r results, echo=c(1)}
+```{r results.setup, echo=FALSE}
 mtcars <- mutate(mtcars, 
                  mpg_hat = predict(bestmodel),
                  mpg_e = resid(bestmodel)) #mtcars$mpg - mpg_hat
 
-# lines ignored for clarity
 # move mpg_hat and mpg_e to 3rd and 4th columns
 mtcars <- mtcars[,c(1,2,ncol(mtcars)-1, ncol(mtcars), 3:(length(mtcars)-2))]
 ```
 
-## Appendix
-```{r nonstandard.functions, echo=FALSE, results='hide', message=FALSE}
-# Multiple plot function
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-# credit: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
-# author: winston@stdout.org
-#
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-
-  numPlots = length(plots)
-
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                    ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-
- if (numPlots==1) {
-    print(plots[[1]])
-
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
+```{r results.residuals, echo=FALSE, fig.width=6.5}
+gg1 <- ggplot(mtcars, aes(x=log.weight, y=mpg_e, col=transmission)) +
+    geom_point() + 
+    geom_smooth(aes(x=log.weight, y=mpg_e), col="black") +
+    labs(title="residuals plot") + 
+    theme(legend.position="top")
+gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg_e, 
+                               col=transmission)) +
+    geom_point() + 
+    geom_smooth(aes(x=log.displacement, y=mpg_e), col="black") +
+    labs(title="residuals plot") + 
+    theme(legend.position="top")
+multiplot(gg1,gg2,cols=2)
 ```
+
+```{r results.confidence, results='asis'}
+tab <- xtable(summary(bestmodel)$coeff)
+print(tab, type = "html")
+```
+
+## Appendix
 
 ```{r exploration.rawdata, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
