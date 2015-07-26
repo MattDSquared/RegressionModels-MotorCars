@@ -5,57 +5,6 @@ date: "Saturday, July 25, 2015"
 output: html_document
 ---
 
-```{r nonstandard.functions, echo=FALSE, results='hide', message=FALSE}
-# Multiple plot function
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-# credit: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
-# author: winston@stdout.org
-#
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-
-  numPlots = length(plots)
-
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                    ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-
- if (numPlots==1) {
-    print(plots[[1]])
-
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
-```
-
 ## Introduction
 _from coursera.org class project description_
 You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
@@ -124,22 +73,146 @@ At first glance, it looks like manual is much better than automatic:
 mtcars %>% group_by(transmission) %>% summarize(mean(mpg))
 ```
 
+However, this does not take into account confounding factors, such as smaller cars tending to have manual drives.
+
+```{r ggfunction, echo=FALSE, results='hide'}
+# consider avoiding ggplot calls inside of a function. Behavior can be unpredictable
+plot.mpg.by <- function(var, main=NULL) {
+    ggplot(mtcars, aes_string(x=var, y="mpg", col="transmission")) +
+        geom_point() + 
+        geom_smooth(method="lm") +
+        geom_smooth(aes_string(x=var, y="mpg"), method="lm", 
+                    col="black", se=FALSE) +
+        labs(title=main)
+}
+```
+
+```{r weight.mpg.transmission, echo=FALSE}
+plot.mpg.by("log.weight", main="MPG vs. Weight and Transmission Type")
+```
+
+### Principle Component Analysis (PCA)
+```{r pca}
+inputs <- select(mtcars, cylinders:n.carburetors)
+mtcars.svd <- svd(scale(sapply(inputs, unclass)))
+
+gg <- ggplot() + 
+    geom_bar(aes(x=1:length(mtcars.svd$d), 
+                 y=mtcars.svd$d^2/sum(mtcars.svd$d^2)),
+             stat="identity",
+             fill="dodgerblue") + 
+    scale_x_discrete(limits=1:length(inputs)) +
+    labs(title="Feature Variance") +
+    labs(x="Orthogonal variables") +
+    labs(y="Proportion of variance explained")
+print(gg)
+```
+
+```{r pca.explore, echo=FALSE}
+eigval <- 1
+gg.svd.eigval <- ggplot() + 
+    geom_bar(aes(x=1:length(inputs), y=mtcars.svd$v[,eigval]),
+             stat="identity",
+             fill="dodgerblue") + 
+        scale_x_discrete(limits=names(inputs)) +
+        labs(title=paste("Composition of eigenvalue",eigval)) +
+        labs(x="Feature") +
+        labs(y="Scaled Column Means")
+print(gg.svd.eigval)
+```
+
+## Model Selection
+Used the ANOVA model search technique to identify variables of interest to our model. We begin with effect of the transmission, since we are specifically interested in it's effect, then observed the variance confidence interval. A confidence of <.05 for significant change between models is designated as the model precision cuttoff. 
+
+```{r ANOVA.model.search, echo=FALSE}
+fit <- list()
+fit[[1]] <- lm(mpg ~ transmission, data=mtcars)
+fit[[2]] <- lm(mpg ~ transmission + log.weight, data=mtcars)
+fit[[3]] <- lm(mpg ~ transmission + log.weight + log.displacement, data=mtcars)
+fit[[4]] <- lm(mpg ~ transmission + log.weight + log.displacement +
+               quarter.mile.time, data=mtcars)
+fit[[5]] <- lm(mpg ~ transmission + 
+                 log.weight + log.displacement +
+                 cylinders + 
+                 power + axle.ratio +
+                 quarter.mile.time + engine.shape +
+                 n.gears + n.carburetors, data=mtcars)
+
+fit.anova <- anova(fit)
+print(fit.anova)
+
+bestfit <- fit[[tail(which(fit.anova$"Pr(>F)" <= .05),n=1)]]
+```
+
+The ANOVA results show that the model `r bestfit$call` will provide an optimal level of modeling without excess variance inflation.
+
+## Model results on mpg vs. transmission type
+
+```{r results}
+
+```
+
+## Appendix
+```{r nonstandard.functions, echo=FALSE, results='hide', message=FALSE}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+# credit: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+# author: winston@stdout.org
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
 ```{r exploration.plots, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
 gg  <- list()
-
 ii <- 0
 for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
     #tmp <- select(mtcars, mpg, transmission, feat.name)
     #rename(tmp, )
     ii <- ii + 1
-    gg[[ii]] <- ggplot(mtcars, aes_string(x=feat.name, 
-                                          y="mpg", 
-                                          col="transmission")) +
-        geom_point() + 
-        geom_smooth(method="lm") +
-        geom_smooth(aes_string(x=feat.name, y="mpg"), method="lm", 
-                    col="black", se=FALSE)
+    gg[[ii]] <- plot.mpg.by(feat.name)
 }
 windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
@@ -151,22 +224,22 @@ multiplot(plotlist = gg, cols=2)
 # ggpairs(mtcars, lower=list(continuous = "smooth"), params=c(method="lm"))
 ```
 
-```{r anova}
-```
-
-## Model reduction
-Used the ANOVA model search technique to identify variables of interest to our model. We begin with effect of the transmission, since we are specifically interested in it's effect. 
-
-```{r ANOVA.model.search, echo=FALSE}
-myfit1 <- lm(mpg ~ transmission, data=mtcars)
-myfit2 <- lm(mpg ~ transmission + log.weight, data=mtcars)
-myfit3 <- lm(mpg ~ transmission + log.weight + log.displacement, data=mtcars)
-myfit_all <- lm(mpg ~ transmission + 
-                 log.weight + log.displacement +
-                 cylinders + 
-                 power + axle.ratio +
-                 quarter.mile.time + engine.shape +
-                 n.gears + n.carburetors, data=mtcars)
-
-print(anova(myfit1, myfit2, myfit3, myfit_all))
+```{r exploration.pca.multiplot, echo=FALSE, fig.width=8, fig.height=10}
+# This doesn't work because of ggplot's inability to calculate valiables from local scope
+#gg  <- list()
+#for (ii in 1:length(mtcars.svd$d)) {
+#    #tmp <- select(mtcars, mpg, transmission, feat.name)
+#    #rename(tmp, )
+#    eigval <<- ii
+#    gg[[ii]] <- ggplot(environment=environment()) + 
+#        geom_bar(aes(x=1:length(inputs), y=mtcars.svd$v[,eigval]),
+#                 stat="identity",
+#                 fill="dodgerblue") + 
+#        scale_x_discrete(limits=names(inputs)) +
+#        labs(title=paste("Composition of eigenvalue",eigval)) +
+#        labs(x="Feature") +
+#        labs(y="Scaled Column Means")
+#}
+#windows(width = 9, height = 10, xpos = 0, rescale="fixed")
+#multiplot(plotlist = gg, cols=2)
 ```
