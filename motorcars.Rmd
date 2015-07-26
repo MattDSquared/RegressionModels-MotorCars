@@ -16,6 +16,9 @@ output: html_document
 # then plot 1 will go in the upper left, 2 will go in the upper right, and
 # 3 will go all the way across the bottom.
 #
+# credit: http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
+# author: winston@stdout.org
+#
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   library(grid)
 
@@ -70,10 +73,15 @@ The mtcars dataset from 1981 will be used to answer these questions.
 library(datasets)
 library(dplyr)
 library(xtable)
+# library(GGally)
 library(ggplot2)
+
+graphics.off()
 
 setwd("~/../datascience/RegressionModels-MotorCars")
 data(mtcars)
+
+# ?mtcars
 
 # rename vars
 mtcars <- rename(mtcars, cylinders=cyl, displacement=disp, power=hp, 
@@ -89,7 +97,12 @@ mtcars <- mutate(mtcars,
                  engine.shape=factor(engine.shape, levels=c(0,1), 
                                      labels=c("v","straight")),
                  transmission=factor(transmission, levels=c(0,1),
-                                     labels=c("automatic","manual")))
+                                     labels=c("automatic","manual")),
+                 log.displacement=log(displacement),
+                 log.weight=log(weight))
+
+# note: engine.shape has levels(0,1) = ("v","straight")
+#       transmission has levels(0,1) = ("auto","manual")
 ```
 
 ```{r, echo=FALSE, results='asis'}
@@ -98,6 +111,11 @@ print(tab, type = "html")
 ```
 
 ## Data Exploration
+
+At first glance, it looks like manual is much better than automatic:
+```{r first.glance, echo=FALSE}
+mtcars %>% group_by(transmission) %>% summarize(mean(mpg))
+```
 
 ```{r exploration.plots, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
@@ -114,6 +132,43 @@ for (feat.name in names(mtcars)[2:ncol(mtcars)]) {
         geom_point() + 
         geom_smooth(method="lm") 
 }
-
+windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
+
+windows(width = 13, height = 11, xpos = 30)
+pairs(mtcars, panel = panel.smooth, main = "Motor Cars", 
+      col = 3 + (mtcars$log.displacement > 5.25))
+
+# ggpairs(mtcars, lower=list(continuous = "smooth"), params=c(method="lm"))
+```
+
+```{r anova}
+```
+
+## Model reduction
+due to the apparent lack of dependence on transmission type, lets factor out the dependence mpg has on displacement and weight.
+
+```{r model.displacement}
+windows(4,3,xpos=0)
+print(gg[[11]])
+#mpg.displacement <- predict()
+
+
+#myfit1 <- lm(mpg ~ transmission, data=mtcars)
+#myfit2 <- lm(mpg ~ 
+#                 transmission + 
+#                 log.weight, 
+#             data=mtcars)
+myfit1 <- lm(mpg ~ transmission, data=mtcars)
+myfit2 <- lm(mpg ~ transmission + log.weight, data=mtcars)
+myfit3 <- lm(mpg ~ transmission + log.weight + log.displacement, data=mtcars)
+myfit_all <- lm(mpg ~ transmission + 
+                 log.weight + log.displacement +
+                 cylinders + 
+                 power + axle.ratio +
+                 quarter.mile.time + engine.shape +
+                 n.gears + n.carburetors, data=mtcars)
+
+print(anova(myfit1, myfit2, myfit3, myfit_all))
+
 ```
