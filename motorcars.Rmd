@@ -66,7 +66,7 @@ R markdown code can be found at my github site: https://github.com/MattDSquared/
 
 ## Setup and data cleaning
 
-The mtcars dataset from 1981 will be used to answer these questions. 
+The mtcars dataset from 1981 will be used to answer these questions. This is located in the `datasets` library
 
 ```{r setup, echo=FALSE, message=FALSE}
 library(datasets)
@@ -94,61 +94,52 @@ mtcars <-  mutate(mtcars, carnames=rownames(mtcars))
 mtcars <- mtcars[,c(ncol(mtcars),1:length(mtcars)-1)]
 ```
 
-```{r cleaning, results='asis'}
+```{r cleaning, echo=c(1,2)}
 # clarify values based on ?mtcars info
 mtcars <- mutate(mtcars,
                  weight=weight*1000,
-                 engine.shape=factor(engine.shape, levels=c(0,1), 
-                                     labels=c("v","straight")),
-                 transmission=factor(transmission, levels=c(0,1),
-                                     labels=c("automatic","manual")),
+                 engine.shape=factor(engine.shape, levels=c(0,1), labels=c("v","straight")),
+                 transmission=factor(transmission, levels=c(0,1),labels=c("automatic","manual")),
                  log.displacement=log(displacement),
                  log.weight=log(weight))
 
-# for ease of using plot(myfit)
-rownames(mtcars) <- mtcars$carnames
+## for ease of using plot(myfit)
+#rownames(mtcars) <- mtcars$carnames
 # note: engine.shape has levels(0,1) = ("v","straight")
 #       transmission has levels(0,1) = ("auto","manual")
 ```
 
 ```{r, echo=FALSE, results='asis'}
-tab <- xtable(head(mtcars))
-print(tab, type = "html")
+#tab <- xtable(head(mtcars))
+#print(tab, type = "html", include.rownames=FALSE)
 ```
 
 ## Data Exploration
 
 At first glance, it looks like manual is much better than automatic:
-```{r first.glance, echo=FALSE}
-mtcars %>% group_by(transmission) %>% summarize(mean(mpg))
+
+```{r first.glance, echo=FALSE, results='asis'}
+mtcars.summary <- mtcars %>% group_by(transmission) %>% summarize(mpg.mean=mean(mpg))
+tab <- xtable(mtcars.summary)
+print(tab, type = "html", include.rownames=FALSE)
 ```
 
-However, this does not take into account confounding factors, such as smaller cars tending to have manual drives.
+However, this does not take into account confounding factors, such as smaller cars tending to have manual drives. 
 
-```{r ggfunction, echo=FALSE, results='hide'}
-# consider avoiding ggplot calls inside of a function. Behavior can be unpredictable
-plot.mpg.by <- function(var, main=NULL) {
-    ggplot(mtcars, aes_string(x=var, y="mpg", col="transmission")) +
-        geom_point() + 
-        geom_smooth(method="lm") +
-        geom_smooth(aes_string(x=var, y="mpg"), method="lm", 
-                    col="black", se=FALSE) +
-        labs(title=main)
-}
-```
-
-```{r weight.mpg.transmission, echo=FALSE}
+```{r weight.mpg.transmission, echo=FALSE, fig.height=4}
 gg1 <- ggplot(mtcars, aes(x=log.weight, y=mpg, col=transmission)) +
     geom_point() + 
+    geom_hline(yintercept=mtcars.summary$mpg.mean, size=1.5)+
     geom_smooth(method="lm") +
     geom_smooth(aes(x=log.weight, y=mpg), 
                 method="lm", col="black", se=FALSE) +
-    labs(title="MPG vs. Weight and Transmission Type") + 
+    labs(title="MPG vs. Weight") + 
     theme(legend.position="top")
 
 gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg, 
                                col=transmission)) +
     geom_point() + 
+    geom_hline(yintercept=mtcars.summary$mpg.mean, size=1.5)+
     geom_smooth(method="lm") +
     geom_smooth(aes(x=log.displacement, y=mpg), 
                 method="lm", col="black", se=FALSE) +
@@ -158,38 +149,8 @@ gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg,
 multiplot(gg1,gg2,cols=2)
 ```
 
-### Principle Component Analysis (PCA)
-```{r pca}
-inputs <- select(mtcars, cylinders:n.carburetors)
-mtcars.svd <- svd(scale(sapply(inputs, unclass)))
-
-gg <- ggplot() + 
-    geom_bar(aes(x=1:length(mtcars.svd$d), 
-                 y=mtcars.svd$d^2/sum(mtcars.svd$d^2)),
-             stat="identity",
-             fill="dodgerblue") + 
-    scale_x_discrete(limits=1:length(inputs)) +
-    labs(title="Feature Variance") +
-    labs(x="Orthogonal variables") +
-    labs(y="Proportion of variance explained")
-print(gg)
-```
-
-```{r pca.explore, echo=FALSE}
-eigval <- 1
-gg.svd.eigval <- ggplot() + 
-    geom_bar(aes(x=1:length(inputs), y=mtcars.svd$v[,eigval]),
-             stat="identity",
-             fill="dodgerblue") + 
-        scale_x_discrete(limits=names(inputs)) +
-        labs(title=paste("Composition of eigenvalue",eigval)) +
-        labs(x="Feature") +
-        labs(y="Scaled Column Means")
-print(gg.svd.eigval)
-```
-
 ## Model Selection
-Used the ANOVA model search technique to identify variables of interest to our model. We begin with effect of the transmission, since we are specifically interested in it's effect, then observed the variance confidence interval. A confidence of <.05 for significant change between models is designated as the model precision cuttoff. 
+The ANOVA model search technique is used to identify variables of interest to our model. We begin with the effect from transmission type, since we are specifically interested in it, then observed the confidence interval for the changes in variance . A confidence of <.05 for significant change between models is designated as the model precision cuttoff. 
 
 ```{r ANOVA.model.search, echo=FALSE}
 fit <- list()
@@ -205,15 +166,35 @@ fit[[5]] <- lm(mpg ~ transmission +
                  quarter.mile.time + engine.shape +
                  n.gears + n.carburetors, data=mtcars)
 
-fit.anova <- anova(fit[[1]], fit[[2]], fit[[3]], fit[[4]], fit[[5]])
-print(fit.anova)
+# for lack of more elegant way to do this, here's a string list of the models
+model.name <- list()
+for (item in sapply(fit, function(myfit) deparse(myfit$call))) {
+    tmp2 <- ""
+    for (entry in item) {
+        tmp2 <- paste0(tmp2,entry)
+    }
+    model.name <- c(model.name,tmp2)
+}
+model.name <- unlist(gsub("     "," ", model.name))
 
-bestmodel <- fit[[tail(which(fit.anova$"Pr(>F)" <= .05),n=1)]]
+# run ANOVA
+fit.anova <- anova(fit[[1]], fit[[2]], fit[[3]], fit[[4]], fit[[5]])
+
+# get the best model
+bestmodel.num <- tail(which(fit.anova$"Pr(>F)" <= .05),n=1)
+bestmodel <- fit[[bestmodel.num]]
 bestmodel.str <- deparse(bestmodel$call)
 bestmodel.str <- paste0(bestmodel.str[1],bestmodel.str[2])
 ```
 
-The ANOVA results show that the model `r bestmodel.str` will provide an optimal level of modeling without excess variance inflation.
+```{r ANOVA.display, echo=FALSE, results='asis'}
+tab <- xtable(data.frame(model.name))
+print(tab, type = "html")
+tab <- xtable(data.frame(fit.anova))
+print(tab, type = "html")
+```
+
+The ANOVA results show that the model `r bestmodel.num`: `r bestmodel.str` will provide an optimal level of model accuracy without excess variance inflation.
 
 ## Model results on mpg vs. transmission type
 
@@ -226,27 +207,91 @@ mtcars <- mutate(mtcars,
 mtcars <- mtcars[,c(1,2,ncol(mtcars)-1, ncol(mtcars), 3:(length(mtcars)-2))]
 ```
 
-```{r results.residuals, echo=FALSE, fig.width=6.5}
+The residuals from this model show some variation near the ends of the data. However, for a linear model, this is a fairly acceptable fit, considering an R^2^ value of `r round(summary(bestmodel)$r.squared,3)` the model. 
+
+```{r results.residuals, echo=FALSE, fig.height=4, fig.width=6.5}
 gg1 <- ggplot(mtcars, aes(x=log.weight, y=mpg_e, col=transmission)) +
     geom_point() + 
     geom_smooth(aes(x=log.weight, y=mpg_e), col="black") +
-    labs(title="residuals plot") + 
+    labs(title="Log(Weight) Residuals") + 
     theme(legend.position="top")
 gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg_e, 
                                col=transmission)) +
     geom_point() + 
     geom_smooth(aes(x=log.displacement, y=mpg_e), col="black") +
-    labs(title="residuals plot") + 
+    labs(title="Log(displacement) Residuals") + 
     theme(legend.position="top")
 multiplot(gg1,gg2,cols=2)
 ```
 
-```{r results.confidence, results='asis'}
+```{r results.confidence, echo=FALSE, results='asis'}
 tab <- xtable(summary(bestmodel)$coeff)
-print(tab, type = "html")
+print(tab, type = "html", include.rownames=FALSE)
 ```
 
+### Model interpretation
+The Intercept of `r round(summary(bestmodel)$coeff[1,1],1)` MPG indicates a not-so-useful value for when an automatic car has log(weight) and log(displacement) equal to 0. More importantly, for each 1 unit change in the log(weight), MPG is expected to decrease by `r round(summary(bestmodel)$coeff[3,1],1)`, holding all other variables constant. Similarly, for each 1 unit change in the log(displacement), MPG is expected to decrease by `r round(summary(bestmodel)$coeff[4,1],1)`, holding all other variables constant. Both of these rates have a significance level <= `r round(max(summary(bestmodel)$coeff[3:4,4]),3)`.
+
+However, the effect of transmission on mpg is very small. In fact, the model shows a manual transmission will change mpg by `r round(summary(bestmodel)$coeff[2,1],1)`, but the standard error for this value is `r round(summary(bestmodel)$coeff[2,2],1)` and it has a p-value of `r round(summary(bestmodel)$coeff[2,4],3)`. 
+
+## Conclusion
+
+Given the high p-value of `r round(summary(bestmodel)$coeff[2,4],3)` and the small effect of `r round(summary(bestmodel)$coeff[2,1],1)` on mpg, no discernable difference in a car's fuel economy can be determined based on it's transmission type.
+
 ## Appendix
+
+### Principle Component Analysis (PCA)
+
+A brief PCA analysis shows highly redundant input data. 
+
+```{r pca}
+inputs <- select(mtcars, cylinders:n.carburetors)
+mtcars.svd <- svd(scale(sapply(inputs, unclass)))
+```
+
+`r round(sum(mtcars.svd$d[1:2]^2/sum(mtcars.svd$d^2))*100,1)`% of the variation in input data can be explained by 2 variables. 
+
+```{r pca.varexplain, echo=FALSE}
+gg <- ggplot() + 
+    geom_bar(aes(x=1:length(mtcars.svd$d), 
+                 y=mtcars.svd$d^2/sum(mtcars.svd$d^2)),
+             stat="identity",
+             fill="dodgerblue") + 
+    scale_x_discrete(limits=1:length(inputs)) +
+    labs(title="Feature Variance") +
+    labs(x="Orthogonal variables") +
+    labs(y="Proportion of variance explained")
+print(gg)
+```
+
+However, that variation would be a combination of nearly every input variable as shown below.
+
+```{r pca.explore, echo=FALSE, warning=FALSE}
+eigval <- 1
+gg.svd.eigval <- ggplot() + 
+    geom_bar(aes(x=1:length(inputs), y=mtcars.svd$v[,eigval]),
+             stat="identity",
+             fill="dodgerblue") + 
+        scale_x_discrete(limits=names(inputs)) +
+        labs(title=paste("Composition of eigenvalue",eigval)) +
+        labs(x="Feature") +
+        labs(y="Scaled Column Means")
+print(gg.svd.eigval)
+```
+
+### Preliminary Plot of Mpg vs. features
+
+```{r ggfunction, echo=FALSE, results='hide'}
+# consider avoiding ggplot calls inside of a function. Behavior can be unpredictable
+plot.mpg.by <- function(var, main=NULL) {
+    ggplot(mtcars, aes_string(x=var, y="mpg", col="transmission")) +
+        geom_point() + 
+        geom_smooth(method="lm") +
+        geom_smooth(aes_string(x=var, y="mpg"), method="lm", 
+                    col="black", se=FALSE) +
+        labs(title=main)
+}
+```
 
 ```{r exploration.rawdata, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
@@ -258,7 +303,7 @@ for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
     ii <- ii + 1
     gg[[ii]] <- plot.mpg.by(feat.name)
 }
-windows(width = 9, height = 10, xpos = 0, rescale="fixed")
+#windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
 
 #windows(width = 13, height = 11, xpos = 30)
@@ -267,6 +312,8 @@ multiplot(plotlist = gg, cols=2)
 
 # ggpairs(mtcars, lower=list(continuous = "smooth"), params=c(method="lm"))
 ```
+
+### Post-analysis plots of Residual MPG vs. features
 
 ```{r exploration.residuals, echo=FALSE, fig.width=8, fig.height=14}
 # MPG vs feature broken out between automatic and manual
@@ -288,7 +335,7 @@ for (feat.name in names(mtcars)[3:ncol(mtcars)]) {
     ii <- ii + 1
     gg[[ii]] <- plot.mpg_e.by(feat.name)
 }
-windows(width = 9, height = 10, xpos = 0, rescale="fixed")
+#windows(width = 9, height = 10, xpos = 0, rescale="fixed")
 multiplot(plotlist = gg, cols=2)
 
 #windows(width = 13, height = 11, xpos = 30)
