@@ -55,18 +55,21 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 }
 ```
 
-## Introduction
-_from coursera.org class project description_
-You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+## Executive Summary
+Pretend, for a moment, the year is 1974. Fuel economy has come on the radar for consumers and you want to know what makes a car have better gas mileage. Particularly, what is the answer to these two questions:
 
-"Is an automatic or manual transmission better for MPG"
-"Quantify the MPG difference between automatic and manual transmissions"
+1) "Is an automatic or manual transmission better for MPG"
+2) "Quantify the MPG difference between automatic and manual transmissions"
 
-R markdown code can be found at my github site: https://github.com/MattDSquared/RegressionModels-MotorCars/blob/master/motorcars.Rmd
+The short answer, surprisingly, is neither. There is no statistically significant difference between an automatic and manual transmission.
+
+Why manual cars are generally thought to get better gas mileage is explained in this report. 
+
+For those interested, the R markdown file for this report can be found at my github site: https://github.com/MattDSquared/RegressionModels-MotorCars/blob/master/motorcars.Rmd
 
 ## Setup and data cleaning
 
-The mtcars dataset from 1981 will be used to answer these questions. This is located in the `datasets` library
+The mtcars dataset from 1974 will be used to answer these questions. This is located in the `datasets` library
 
 ```{r setup, echo=FALSE, message=FALSE}
 library(datasets)
@@ -124,6 +127,7 @@ tab <- xtable(mtcars.summary)
 print(tab, type = "html", include.rownames=FALSE)
 ```
 
+  
 However, this does not take into account confounding factors, such as smaller cars tending to have manual drives. 
 
 ```{r weight.mpg.transmission, echo=FALSE, fig.height=4}
@@ -149,8 +153,10 @@ gg2 <- ggplot(mtcars, aes(x=log.displacement, y=mpg,
 multiplot(gg1,gg2,cols=2)
 ```
 
+Note that the natural log of weight and engine displacement were used since the power (and therefore displacement) required by a car is non-linear with respect to weight. 
+
 ## Model Selection
-The ANOVA model search technique is used to identify variables of interest to our model. We begin with the effect from transmission type, since we are specifically interested in it, then observed the confidence interval for the changes in variance . A confidence of <.05 for significant change between models is designated as the model precision cuttoff. 
+The ANOVA model search technique is used to identify variables of interest to our model. We begin with the effect from transmission type, since we are specifically interested in it, then observed the confidence interval for the changes in variance . A confidence of <.05 for significant change between models is designated as the model precision cutoff. 
 
 ```{r ANOVA.model.search, echo=FALSE}
 fit <- list()
@@ -225,8 +231,8 @@ multiplot(gg1,gg2,cols=2)
 ```
 
 ```{r results.confidence, echo=FALSE, results='asis'}
-tab <- xtable(summary(bestmodel)$coeff)
-print(tab, type = "html", include.rownames=FALSE)
+tab <- xtable(summary(bestmodel)$coef)
+print(tab, type = "html")
 ```
 
 ### Model interpretation
@@ -236,7 +242,7 @@ However, the effect of transmission on mpg is very small. In fact, the model sho
 
 ## Conclusion
 
-Given the high p-value of `r round(summary(bestmodel)$coeff[2,4],3)` and the small effect of `r round(summary(bestmodel)$coeff[2,1],1)` on mpg, no discernable difference in a car's fuel economy can be determined based on it's transmission type.
+Given the high p-value of `r round(summary(bestmodel)$coeff[2,4],3)` and the small effect of `r round(summary(bestmodel)$coeff[2,1],1)` on mpg, no discernible difference in a car's fuel economy can be determined based on it's transmission type.
 
 ## Appendix
 
